@@ -2,7 +2,7 @@ import os
 import argparse
 import pandas as pd
 
-def editar_tbl(mann_list:list):
+def editar_chanparm(mann_list:list):
     
     path_chanparm = '/home/msuarez/wrf-hydro-calibration'
 
@@ -26,6 +26,22 @@ def editar_tbl(mann_list:list):
     with open(path_chanparm+'/CHANPARM.TBL', 'w') as file:
         file.write(filedata)
 
+def editar_genparm(refdk_value,refkdt_value):
+    
+    path_genparm = '/home/msuarez/wrf-hydro-calibration'
+
+    # Se copia el archivo temporal
+    os.system('cp -a '+path_genparm+'/GENPARM_Temp.TBL '+path_genparm+'/GENPARM.TBL')
+
+    # Se reemplazan las variables en el namelist
+    with open(path_genparm+'/GENPARM.TBL', 'r') as file :
+        filedata = file.read()
+    filedata = filedata.replace('refdk' , refdk_value)
+    filedata = filedata.replace('refkdt', refkdt_value)
+
+    with open(path_genparm+'/GENPARM.TBL', 'w') as file:
+        file.write(filedata)
+
 
 def main():
 
@@ -47,18 +63,38 @@ def main():
     #args = parser.parse_args()
 
 
-#    mann_list = ['1','2','3','4','5','6','7','88','89','2142']
+
     
-    data = pd.read_csv("mann_streamorder.csv")
+    # Se lee el archivo con los manning de los streamorder
+    data          = pd.read_csv("mann_streamorder.csv")
+    refdk_values  = pd.read_csv("refdk_file.csv")
+    refkdt_values = pd.read_csv("refkdt_file.csv")
+    # Itero sobre las columnas en el csv con los streamorder
     for column in data.columns:
+
         mann_list = []
+        # Leo los valores del archivo streamorder manning
         for k in range(10):
             mann_list.append(str(data[column].iloc[k]))
 
+        # Edito el CHANPARM.TBL
+        os.system("echo 'Se configura el archivo CHANPARM.TBL'")
+        editar_chanparm(mann_list)
+        #os.system('cat CHANPARM.TBL')
+        os.system("echo 'Archivo CHANPARM.TBL configurado'")
 
-    editar_tbl(mann_list)
+        # Itero sobre los valores de refdk
+        for i in range(len(refdk_values.index)):
+            refdk = str(refdk_values['refdk_value'].iloc[i])
+            # Itero sobre los valores de refkdt
+            for j in range(len(refkdt_values.index)):
+                refkdt = str(refkdt_values['refkdt_value'].iloc[j])
+
+                os.system("echo 'Se configura el archivo GENPARM.TBL'")
+                editar_genparm(refdk, refkdt)
+                #os.system('cat GENPARM.TBL')
+                os.system("echo 'Archivo GENPARM.TBL configurado'")
 
 
 if __name__ == "__main__":
     main()
-
