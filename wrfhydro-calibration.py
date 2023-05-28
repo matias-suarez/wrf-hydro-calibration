@@ -2,7 +2,22 @@ import os
 import argparse
 import pandas as pd
 
+
+# Este script ejecuta el modelo WRF-Hydro Standalone con distintas configuraciones
+# con el objetivo de calibrarlo. 
+# Cuestiones a tener en cuenta:
+
+
 def editar_chanparm(mann_list:list):
+    '''
+    Esta función edita el archivo CHANPARM.TBL
+
+    Parámetros de entrada:
+        - mann_list: Lista de 10 valores de Manning.
+                     Cada elemento de la lista debe ser un string.
+    Salida:
+        - Archivo CHANPARM.TBL editado.
+    '''
     
     path_chanparm = '/home/msuarez/wrf-hydro-calibration'
 
@@ -27,6 +42,15 @@ def editar_chanparm(mann_list:list):
         file.write(filedata)
 
 def editar_genparm(refdk_value,refkdt_value):
+    '''
+    Esta función edita el archivo GENPARM.TBL
+
+    Parámetros de entrada:
+        - refdk_value: str con el valor de infiltración.
+        - refkdt_value: str con el valor de tasa de infiltración del suelo.
+    Salida:
+        - Archivo GENPARM.TBL editado.
+    '''
     
     path_genparm = '/home/msuarez/wrf-hydro-calibration'
 
@@ -66,16 +90,20 @@ def main():
 
     
     # Se lee el archivo con los manning de los streamorder
-    data          = pd.read_csv("mann_streamorder.csv")
+    mann_data     = pd.read_csv("mann_streamorder.csv")
     refdk_values  = pd.read_csv("refdk_file.csv")
     refkdt_values = pd.read_csv("refkdt_file.csv")
+
+    sim = 1
+
     # Itero sobre las columnas en el csv con los streamorder
-    for column in data.columns:
+    for column in mann_data.columns:
 
         mann_list = []
-        # Leo los valores del archivo streamorder manning
+        # Leo los valores del archivo streamorder manning para llamar a la funcion que edita el archivo
         for k in range(10):
-            mann_list.append(str(data[column].iloc[k]))
+            mann_list.append(str(mann_data[column].iloc[k]))
+        # mann_list sale del loop con lo valores necesarios para la edición
 
         # Edito el CHANPARM.TBL
         os.system("echo 'Se configura el archivo CHANPARM.TBL'")
@@ -95,6 +123,20 @@ def main():
                 #os.system('cat GENPARM.TBL')
                 os.system("echo 'Archivo GENPARM.TBL configurado'")
 
+                os.system("echo 'Simulación '"+str(sim))
+                os.system("echo 'Manning values: '"+str(mann_list))
+                os.system("echo 'REFDK value: '"+refdk)
+                os.system("echo 'REFKDT value: '"+refkdt)
+
+                os.system("echo 'Se inicia ejecución de la simulación'")
+                os.system('mpirun -np 6 ./wrf_hydro.exe')
+                os.system("echo 'Simulación finalizada'")
+                sim = sim + 1
+
+    os.system("echo ' ******************************** '")
+    os.system("echo ' ****** PROCESO FINALIZADO ****** '")
+    os.system("echo ' ******************************** '")
+    os.system("echo 'Se realizaron '"+str(sim-1)+" simulaciones")
 
 if __name__ == "__main__":
     main()
