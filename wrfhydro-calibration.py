@@ -53,7 +53,7 @@ import glob
 
 # Indicar directorio de salida. Ejemplo:
 # output_dir = '/home/user/output/'
-output_dir = '/home/msuarez/Documents/Sims_WRFHYDRO/'
+output_dir = '/home/msuarez/WRFHYDRO/domain/Santa_Rosa/OUTPUT/'
 
 ######################################################################################################
 ######################################################################################################
@@ -71,7 +71,7 @@ def editar_chanparm(mann_list:list):
         - Archivo CHANPARM.TBL editado.
     '''
     
-    path_chanparm = '/home/msuarez/wrf-hydro-calibration'
+    path_chanparm = '/home/msuarez/WRFHYDRO/domain/Santa_Rosa'
 
     # Se copia el archivo temporal
     os.system('cp -a '+path_chanparm+'/CHANPARM_Temp.TBL '+path_chanparm+'/CHANPARM.TBL')
@@ -104,7 +104,7 @@ def editar_genparm(refdk_value,refkdt_value):
         - Archivo GENPARM.TBL editado.
     '''
     
-    path_genparm = '/home/msuarez/wrf-hydro-calibration'
+    path_genparm = '/home/msuarez/WRFHYDRO/domain/Santa_Rosa'
 
     # Se copia el archivo temporal
     os.system('cp -a '+path_genparm+'/GENPARM_Temp.TBL '+path_genparm+'/GENPARM.TBL')
@@ -132,6 +132,10 @@ def main():
 
     sim = 1
 
+    print('Borrando archivo frxst_pts_out.txt existente')
+    os.system("rm frxst_pts_out.txt")
+    print('Se continua con la ejecución del autocalibrador...')
+
     # Aca se iran guardando las metricas estadisticas calculadas para todas las simulaciones posibles
     # Creo un dataframe vacio donde se van a ir guardando las metricas
     # de todas las simulaciones
@@ -139,6 +143,10 @@ def main():
 
     # Itero sobre las columnas en el csv con los streamorder
     for column in mann_data.columns:
+
+        os.system("echo '***************************************************'")
+        os.system("echo '***************************************************'")
+        os.system("echo '***************************************************'")
 
         mann_list = []
         # Leo los valores del archivo streamorder manning para llamar a la funcion que edita el archivo
@@ -177,13 +185,22 @@ def main():
                 os.system("echo 'REFDK value: '"+refdk)
                 os.system("echo 'REFKDT value: '"+refkdt)
 
+                os.system("echo '***************************************************'")
+                os.system("echo '***************************************************'")
+                os.system("echo '***************************************************'")
+
                 os.system("echo 'Se inicia ejecución de la simulación'")
                 try:
                     os.system('mpirun -np 6 ./wrf_hydro.exe')
                 except Exception as err:
                     print('Ocurrio un error durante la ejecución del modelo')
                     print(err)
-                os.system("echo 'Simulación finalizada'")
+                os.system("echo '***************************************************'")
+                os.system("echo '***************************************************'")
+                os.system("echo '************** Simulación finalizada **************'")
+                os.system("echo '***************************************************'")
+                os.system("echo '***************************************************'")
+                os.system("tail diag_hydro.00000")
 
 
                 ######################################################################################################
@@ -282,13 +299,16 @@ def main():
 
                         plt.legend()
                         plt.tight_layout()
-                        plt.savefig(output_dir+'Sim1_p'+str(i)+'.png', dpi=250, facecolor='white')
+                        plt.savefig(output_dir+'Sim'+str(sim)+'_p'+str(i+1)+'.png', dpi=250, facecolor='white')
                 except Exception as err:
                     print('Ocurrio un error durante el plot de los caudales observados vs simulados')
                     print(err)
 
                 try:
                     # Hago un loop sobre todos los archivos con caudales observados
+                    frxs_point = 1 # frxs_point es para identificar el punto que estamos analizando
+                                   # Recordar que si hay varios archivos con cudales observados habra
+                                   # varias comparaciones que realizar en una misma simulacion
                     for i in range(len(Filelist)):
                         # Creo un df temporal
                         df_temp = pd.DataFrame()
@@ -302,12 +322,21 @@ def main():
                                 print(f"Index Error: {error}")
                                 continue
                             # Voy guardando los caudales simulados y observados en el dataframe df_temp
-                            df_temp = df_temp.append({'Fecha': index,
-                                                      'QSIM' :float(element[5]),
-                                                      'QOBS' :float(a['Caudal'])},
-                                                      ignore_index=True)
+                            #df_temp = df_temp.append({'Fecha': index,
+                            #                          'QSIM' :float(element[5]),
+                            #                          'QOBS' :float(a['Caudal'])},
+                            #                          ignore_index=True)
+
+                            data = {'QSIM' :float(element[5]),
+                                    'QOBS' :float(a['Caudal'])}
+
+                            df_temporal2 = pd.DataFrame(data, index=[index])
+
+                            df_temp = pd.concat([df_temp, df_temporal2])
+
                         # Seteo el indice
-                        df_temp.set_index('Fecha', inplace=True)
+                        df_temp.index.name = 'Fecha'
+                        #df_temp.set_index('Fecha', inplace=True)
                         # Calculo el numero de datos que tengo
                         N = df_temp['QOBS'].count()
                         # Calculo el root mean square error
@@ -319,9 +348,13 @@ def main():
                         # Guardo las metricas en un diccionario llamado data
                         data = {'RMSE': [rmse], 'BIAS': [bias], 'CC': [cc]}
                         # Paso el diccionario anterior a un dataframe
-                        temp_metricas_df = pd.DataFrame(data=data, index=['Sim'+str(i)])
+                        temp_metricas_df = pd.DataFrame(data=data, index=['Sim_'+str(sim)+'_frxstpoint_'+str(frxs_point)])
                         # Concateno el resultado de cada vuelta de loop al dataframe metricas_df
                         metricas_df = pd.concat([metricas_df,temp_metricas_df])
+                        # Exporto el dataframe con los caudales obs vs simulados para este nro de simulacion
+                        df_temp.to_csv(output_dir+'Sim_'+str(sim)+'_frxstpoint_'+str(frxs_point)+'.csv')
+
+                        frxs_point = frxs_point+1
                 except Exception as err:
                     print('Ocurrio un error durante el calculo de las metricas estadisticas')
                     print(err)
@@ -343,7 +376,11 @@ def main():
     metricas_df.to_csv(output_dir+'metricas_autocalibracion.csv')
 
     os.system("echo ' ******************************** '")
+    os.system("echo ' ******************************** '")
+    os.system("echo ' ******************************** '")
     os.system("echo ' ****** PROCESO FINALIZADO ****** '")
+    os.system("echo ' ******************************** '")
+    os.system("echo ' ******************************** '")
     os.system("echo ' ******************************** '")
     os.system("echo 'Se realizaron '"+str(sim-1)+" simulaciones")
 
